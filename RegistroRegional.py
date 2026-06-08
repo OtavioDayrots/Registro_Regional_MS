@@ -2,6 +2,7 @@
 
 import pyodbc
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.utils import get_column_letter
@@ -26,31 +27,31 @@ def plotGraph(ws, max_row, nomeL):
     series = Series(yvalues, xvalues, title="RDA")
     chart1.series.append(series)
 
-    yvalues = Reference(ws, min_col=3, min_row=2, max_row=max_row)
+    yvalues = Reference(ws, min_col=5, min_row=2, max_row=max_row)
     series = Series(yvalues, xvalues, title="RCE - Sanesul")
     chart1.series.append(series)
 
-    yvalues = Reference(ws, min_col=4, min_row=2, max_row=max_row)
+    yvalues = Reference(ws, min_col=6, min_row=2, max_row=max_row)
     series = Series(yvalues, xvalues, title="RCE - Oneroso \n Terceiros")
     chart1.series.append(series)
 
-    yvalues = Reference(ws, min_col=5, min_row=2, max_row=max_row)
+    yvalues = Reference(ws, min_col=7, min_row=2, max_row=max_row)
     series = Series(yvalues, xvalues, title="RCE - Oneroso \n Ms-Pantanal")
     chart1.series.append(series)
 
-    yvalues = Reference(ws, min_col=6, min_row=2, max_row=max_row)
+    yvalues = Reference(ws, min_col=9, min_row=2, max_row=max_row)
     series = Series(yvalues, xvalues, title="ECON")
     chart2.series.append(series)
 
-    yvalues = Reference(ws, min_col=7, min_row=2, max_row=max_row)
+    yvalues = Reference(ws, min_col=10, min_row=2, max_row=max_row)
     series = Series(yvalues, xvalues, title="PEND")
     chart2.series.append(series)
 
     chart1.title = nomeL + "--RDA e RCE"
     chart1.width = 16.5
-    ws.add_chart(chart1, "I3")
+    ws.add_chart(chart1, "L3")
     chart2.title = nomeL + "--ECON e PENDENTES"
-    ws.add_chart(chart2, "I18")
+    ws.add_chart(chart2, "L18")
 
 
 def nome(nomeR):
@@ -79,13 +80,27 @@ def nome(nomeR):
 if __name__ == "__main__":
     # Conectando com o banco de dados
     con = pyodbc.connect(
-        "DRIVER={SQL Server};SERVER=10.100.100.48\\SCI;PORT=1433;DATABASE=SCI;Trusted_Connection=yes;"
+        "DRIVER={SQL Server};"
+        "SERVER=10.100.100.48\\SCI;"
+        "PORT=1433;"
+        "DATABASE=SCI;"
+        "Trusted_Connection=yes;"
     )
+    con_os = pyodbc.connect(
+    "DRIVER={SQL Server};"
+    "SERVER=10.100.100.48\\SCI;"
+    "DATABASE=SCI;"
+    "Trusted_Connection=yes;"
+    )
+
+    con
     # Consultando a tabela do banco
     conRegional = "select distinct(regional) from resultado;"
     cursor = con.cursor()
+    cursor_os = con_os.cursor()
     cursor.execute(conRegional)
-    regional = cursor.fetchall()
+    os_por_regional_mes = {}
+    regionais = cursor.fetchall()
     wb = Workbook()
     conResultado = """select regional, max(datageracao) as datageracao, referencia as DATA, COALESCE(sum(RDA),0) as RDA, COALESCE(sum(RCE),0) as [RCE - Sanesul],
             COALESCE(sum(RCE_TERCEIRO),0) AS [RCE - Oneroso Terceiros],COALESCE(sum(RCE_MSP),0) AS [RCE - Oneroso MS-Pantanal],COALESCE(sum(ECON),0) as ECON,
@@ -96,8 +111,23 @@ if __name__ == "__main__":
 			COALESCE(SUM(RCE_TERCEIRO),0) AS [RCE - Oneroso Terceiros], COALESCE(SUM(RCE_MSP),0) AS [RCE - Oneroso MS-Pantanal], COALESCE(sum(ECON),0) as ECON, 
 			COALESCE(sum(DDIFF),0) as PEND from resultado where datageracao in (select max(DATAGERACAO) as DATAGERACAO from resultado group by referencia, local)
 			and regional = ?  group by regional, referencia order by regional, datageracao;"""
+    
+    sql_esquemas = """
+    SELECT DISTINCT ESQUEMA, REGIONAL
+    FROM historico_resultado
+    """
 
-    for r in regional:
+    cursor.execute(sql_esquemas)
+
+    regionais_esquemas = {}
+
+    for esquema, nome_regional in cursor.fetchall():
+        regionais_esquemas.setdefault(
+            nome_regional.strip(),
+            []
+        ).append(str(esquema))
+
+    for r in regionais:
         ws = wb.create_sheet(nome(r[0]), -1)
         col = [
             "DATA",
@@ -138,18 +168,83 @@ if __name__ == "__main__":
         nLinhas = 0
         cursor.execute(conResultado, r[0], r[0])
         row = cursor.fetchone()
+        print("Regional:", r[0])
+        print("Primeira linha:", row)
+        print("Regional:", r[0], "Linhas:", nLinhas)
         anterior = 0
-        wsAnterior = True
+        rda_anterior = None
+        rce_anterior = None
+
         while row != None:
-            row[2] = datetime.strptime(row[2], "%m/%Y")
-            if row[2] != anterior:
+            referencia = datetime.strptime(row[2], "%m/%Y")
+
+            if referencia != anterior:
+
+                inicio = referencia
+                fim = inicio + relativedelta(months=1)
+
+                total_os = 0
+
+                try:
+                    cursor_os.execute(sql, inicio, fim)
+                    chave = (
+                        r[0].strip(),
+                        referencia.strftime("%Y-%m")
+                    )
+
+                    total_os = os_por_regional_mes.get(chave, 0)
+                    
+                except Exception as e:
+                    print(f"Erro no esquema {esquema}: {e}")
+
                 nLinhas += 1
-                ws.append(row[2:])
-            anterior = row[2]
+
+                rda_atual = row[3]
+                rce_atual = (
+                    (row[4] or 0) +
+                    (row[5] or 0) +
+                    (row[6] or 0)
+                )
+
+                if rda_anterior is None or rda_anterior == 0:
+                    crescimento_rda = 0
+                else:
+                    crescimento_rda = (
+                        (rda_atual - rda_anterior) / rda_anterior
+                    )
+
+                if rce_anterior is None or rce_anterior == 0:
+                    crescimento_rce = 0
+                else:
+                    crescimento_rce = (
+                        (rce_atual - rce_anterior) / rce_anterior
+                    )
+
+
+                nova_linha = [
+                    row[2],                 # DATA
+                    row[3],                 # RDA
+                    crescimento_rda,        # Crescimento RDA
+                    total_os,               # OS Implantação de RDA
+                    row[4],                 # RCE - Sanesul
+                    row[5],                 # RCE - Oneroso Terceiros
+                    row[6],                 # RCE - Oneroso MS-Pantanal
+                    crescimento_rce,        # Crescimento RCE
+                    row[7],                 # ECON
+                    row[8],                 # PENDENTES
+                ]
+
+                ws.append(nova_linha)
+
+                rda_anterior = rda_atual
+                rce_anterior = rce_atual
+
+            anterior = referencia
             row = cursor.fetchone()
-            if ws["F" + str(nLinhas + 1)].value and wsAnterior:
-                f = str(nLinhas + 1)
-                wsAnterior = False
+
+        for coluna in ["C", "H"]:
+            for cell in ws[coluna]:
+                cell.number_format = "0.000%"
 
         for cell in ws["A"]:
             cell.number_format = "mmm-yy"
@@ -158,19 +253,23 @@ if __name__ == "__main__":
         ws["A" + saldo] = "Saldo = "
         ws["A" + saldo].fill = PatternFill("solid", fgColor="00FFFF00")
 
+        print("nLinhas =", nLinhas)
+        print("B2 =", ws["B2"].value)
+        print("B" + str(nLinhas + 1), "=", ws["B" + str(nLinhas + 1)].value)
+
         ws["B" + saldo].value = ws["B" + str(nLinhas + 1)].value - ws["B2"].value
         ws["B" + saldo].fill = PatternFill("solid", fgColor="00FFFF00")
-
-        ws["C" + saldo].value = ws["C" + str(nLinhas + 1)].value - ws["C2"].value
-        ws["C" + saldo].fill = PatternFill("solid", fgColor="00FFFF00")
-
-        ws["D" + saldo].value = ws["D" + str(nLinhas + 1)].value - ws["D2"].value
-        ws["D" + saldo].fill = PatternFill("solid", fgColor="00FFFF00")
 
         ws["E" + saldo].value = ws["E" + str(nLinhas + 1)].value - ws["E2"].value
         ws["E" + saldo].fill = PatternFill("solid", fgColor="00FFFF00")
 
-        ws["F" + saldo].value = ws["F" + str(nLinhas + 1)].value - ws["F" + f].value
+        ws["F" + saldo].value = ws["F" + str(nLinhas + 1)].value - ws["F2"].value
         ws["F" + saldo].fill = PatternFill("solid", fgColor="00FFFF00")
+
+        ws["G" + saldo].value = ws["G" + str(nLinhas + 1)].value - ws["G2"].value
+        ws["G" + saldo].fill = PatternFill("solid", fgColor="00FFFF00")
+
+        ws["I" + saldo].value = ws["I" + str(nLinhas + 1)].value - ws["I2"].value
+        ws["I" + saldo].fill = PatternFill("solid", fgColor="00FFFF00")
 
     wb.save("registroRegional.xlsx")
