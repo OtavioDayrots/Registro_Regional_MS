@@ -127,6 +127,33 @@ if __name__ == "__main__":
             []
         ).append(str(esquema))
 
+    for regional, esquemas in regionais_esquemas.items():
+        for esquema in esquemas:
+
+            sql = f"""
+            SELECT
+                FORMAT(databaixa,'yyyy-MM') as mes,
+                COUNT(*) as total
+            FROM [{esquema}].[os_com_orfa]
+            WHERE grupo = '57'
+            GROUP BY FORMAT(databaixa,'yyyy-MM')
+            """
+
+            try:
+                cursor_os.execute(sql)
+
+                for mes, total in cursor_os.fetchall():
+
+                    chave = (regional, mes)
+
+                    os_por_regional_mes[chave] = (
+                        os_por_regional_mes.get(chave, 0)
+                        + total
+                    )
+
+            except Exception as e:
+                print(f"Erro no esquema {esquema}: {e}")
+
     for r in regionais:
         ws = wb.create_sheet(nome(r[0]), -1)
         col = [
@@ -180,23 +207,13 @@ if __name__ == "__main__":
 
             if referencia != anterior:
 
-                inicio = referencia
-                fim = inicio + relativedelta(months=1)
+                chave = (
+                    r[0].strip(),
+                    referencia.strftime("%Y-%m")
+                )
 
-                total_os = 0
-
-                try:
-                    cursor_os.execute(sql, inicio, fim)
-                    chave = (
-                        r[0].strip(),
-                        referencia.strftime("%Y-%m")
-                    )
-
-                    total_os = os_por_regional_mes.get(chave, 0)
-                    
-                except Exception as e:
-                    print(f"Erro no esquema {esquema}: {e}")
-
+                total_os = os_por_regional_mes.get(chave, 0)
+                
                 nLinhas += 1
 
                 rda_atual = row[3]
