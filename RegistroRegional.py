@@ -27,31 +27,31 @@ def plotGraph(ws, max_row, nomeL):
     series = Series(yvalues, xvalues, title="RDA")
     chart1.series.append(series)
 
-    yvalues = Reference(ws, min_col=5, min_row=2, max_row=max_row)
+    yvalues = Reference(ws, min_col=6, min_row=2, max_row=max_row)
     series = Series(yvalues, xvalues, title="RCE - Sanesul")
     chart1.series.append(series)
 
-    yvalues = Reference(ws, min_col=6, min_row=2, max_row=max_row)
+    yvalues = Reference(ws, min_col=7, min_row=2, max_row=max_row)
     series = Series(yvalues, xvalues, title="RCE - Oneroso \n Terceiros")
     chart1.series.append(series)
 
-    yvalues = Reference(ws, min_col=7, min_row=2, max_row=max_row)
+    yvalues = Reference(ws, min_col=8, min_row=2, max_row=max_row)
     series = Series(yvalues, xvalues, title="RCE - Oneroso \n Ms-Pantanal")
     chart1.series.append(series)
 
-    yvalues = Reference(ws, min_col=9, min_row=2, max_row=max_row)
+    yvalues = Reference(ws, min_col=10, min_row=2, max_row=max_row)
     series = Series(yvalues, xvalues, title="ECON")
     chart2.series.append(series)
 
-    yvalues = Reference(ws, min_col=10, min_row=2, max_row=max_row)
+    yvalues = Reference(ws, min_col=11, min_row=2, max_row=max_row)
     series = Series(yvalues, xvalues, title="PEND")
     chart2.series.append(series)
 
     chart1.title = nomeL + "--RDA e RCE"
     chart1.width = 16.5
-    ws.add_chart(chart1, "L3")
+    ws.add_chart(chart1, "M3")
     chart2.title = nomeL + "--ECON e PENDENTES"
-    ws.add_chart(chart2, "L18")
+    ws.add_chart(chart2, "M18")
 
 
 def nome(nomeR):
@@ -102,14 +102,19 @@ if __name__ == "__main__":
     os_por_regional_mes = {}
     regionais = cursor.fetchall()
     wb = Workbook()
-    conResultado = """select regional, max(datageracao) as datageracao, referencia as DATA, COALESCE(sum(RDA),0) as RDA, COALESCE(sum(RCE),0) as [RCE - Sanesul],
-            COALESCE(sum(RCE_TERCEIRO),0) AS [RCE - Oneroso Terceiros],COALESCE(sum(RCE_MSP),0) AS [RCE - Oneroso MS-Pantanal],COALESCE(sum(ECON),0) as ECON,
-            COALESCE(sum(DDIFF),0) as PEND	from historico_resultado where 
-            regional = ? group by regional, referencia, RCE_TERCEIRO, RCE_MSP
+    conResultado = """select regional, max(datageracao) as datageracao, referencia as DATA,
+            COALESCE(sum(RDA),0) as RDA, COALESCE(SUM(RDA_TERCEIRO),0) AS [RDA - Oneroso Terceiros],
+            COALESCE(sum(RCE),0) as [RCE - Sanesul], COALESCE(sum(RCE_TERCEIRO),0) AS [RCE - Oneroso Terceiros],COALESCE(sum(RCE_MSP),0) AS [RCE - Oneroso MS-Pantanal],
+            COALESCE(sum(ECON),0) as ECON, COALESCE(sum(DDIFF),0) as PEND	
+            from historico_resultado
+            where regional = ? group by regional, referencia, RCE_TERCEIRO, RCE_MSP
 			union
-            select regional, max(datageracao) as datageracao, referencia as DATA, COALESCE(sum(RDA),0) as RDA, COALESCE(sum(RCE),0) as [RCE - Sanesul], 
-			COALESCE(SUM(RCE_TERCEIRO),0) AS [RCE - Oneroso Terceiros], COALESCE(SUM(RCE_MSP),0) AS [RCE - Oneroso MS-Pantanal], COALESCE(sum(ECON),0) as ECON, 
-			COALESCE(sum(DDIFF),0) as PEND from resultado where datageracao in (select max(DATAGERACAO) as DATAGERACAO from resultado group by referencia, local)
+            select regional, max(datageracao) as datageracao, referencia as DATA,
+            COALESCE(sum(RDA),0) as RDA, COALESCE(SUM(RDA_TERCEIRO),0) AS [RDA - Oneroso Terceiros],
+            COALESCE(sum(RCE),0) as [RCE - Sanesul], COALESCE(SUM(RCE_TERCEIRO),0) AS [RCE - Oneroso Terceiros], COALESCE(SUM(RCE_MSP),0) AS [RCE - Oneroso MS-Pantanal],
+            COALESCE(sum(ECON),0) as ECON, COALESCE(sum(DDIFF),0) as PEND
+            from resultado
+            where datageracao in (select max(DATAGERACAO) as DATAGERACAO from resultado group by referencia, local)
 			and regional = ?  group by regional, referencia order by regional, datageracao;"""
     
     sql_esquemas = """
@@ -159,6 +164,7 @@ if __name__ == "__main__":
         col = [
             "DATA",
             "RDA",
+            "RDA - Oneroso Terceiros",
             "Crescimento RDA",
             "OS Implantação de RDA",
             "RCE - Sanesul",
@@ -171,6 +177,7 @@ if __name__ == "__main__":
         com = [
             "DATA - Mês e Ano",
             "RDA - Rede de Distribuição de Água - Extensão de Rede de água com status da rede = ""existente""",
+            "RDA - Oneroso Terceiros - Rede de Distribuição de Água Terceiros - Extensão de Rede de água com status da rede = ""Oneroso Terceiros""",
             "Crescimento RDA - Variação do Total de RDA em relação ao período anterior",
             "OS Implantação de RDA - Ordens de Serviço para Implantação de RDA",
             "RCE - Sanesul - Rede coletora de Esgoto Sanesul - Extensão de Rede de Esgoto com status da rede = ""existente""",
@@ -216,11 +223,14 @@ if __name__ == "__main__":
                 
                 nLinhas += 1
 
-                rda_atual = row[3]
+                rda_atual = (
+                    (row[3] or 0) +
+                    (row[4] or 0)
+                )
                 rce_atual = (
-                    (row[4] or 0) +
                     (row[5] or 0) +
-                    (row[6] or 0)
+                    (row[6] or 0) +
+                    (row[7] or 0)
                 )
 
                 if rda_anterior is None or rda_anterior == 0:
@@ -241,14 +251,15 @@ if __name__ == "__main__":
                 nova_linha = [
                     row[2],                 # DATA
                     row[3],                 # RDA
+                    row[4],                 # RDA - Oneroso Terceiros
                     crescimento_rda,        # Crescimento RDA
                     total_os,               # OS Implantação de RDA
-                    row[4],                 # RCE - Sanesul
-                    row[5],                 # RCE - Oneroso Terceiros
-                    row[6],                 # RCE - Oneroso MS-Pantanal
+                    row[5],                 # RCE - Sanesul
+                    row[6],                 # RCE - Oneroso Terceiros
+                    row[7],                 # RCE - Oneroso MS-Pantanal
                     crescimento_rce,        # Crescimento RCE
-                    row[7],                 # ECON
-                    row[8],                 # PENDENTES
+                    row[8],                 # ECON
+                    row[9],                 # PENDENTES
                 ]
 
                 ws.append(nova_linha)
@@ -259,7 +270,7 @@ if __name__ == "__main__":
             anterior = referencia
             row = cursor.fetchone()
 
-        for coluna in ["C", "H"]:
+        for coluna in ["D", "I"]:
             for cell in ws[coluna]:
                 cell.number_format = "0.000%"
 
@@ -277,16 +288,15 @@ if __name__ == "__main__":
         ws["B" + saldo].value = ws["B" + str(nLinhas + 1)].value - ws["B2"].value
         ws["B" + saldo].fill = PatternFill("solid", fgColor="00FFFF00")
 
-        ws["E" + saldo].value = ws["E" + str(nLinhas + 1)].value - ws["E2"].value
-        ws["E" + saldo].fill = PatternFill("solid", fgColor="00FFFF00")
-
         ws["F" + saldo].value = ws["F" + str(nLinhas + 1)].value - ws["F2"].value
         ws["F" + saldo].fill = PatternFill("solid", fgColor="00FFFF00")
-
         ws["G" + saldo].value = ws["G" + str(nLinhas + 1)].value - ws["G2"].value
         ws["G" + saldo].fill = PatternFill("solid", fgColor="00FFFF00")
 
-        ws["I" + saldo].value = ws["I" + str(nLinhas + 1)].value - ws["I2"].value
-        ws["I" + saldo].fill = PatternFill("solid", fgColor="00FFFF00")
+        ws["H" + saldo].value = ws["H" + str(nLinhas + 1)].value - ws["H2"].value
+        ws["H" + saldo].fill = PatternFill("solid", fgColor="00FFFF00")
+
+        ws["J" + saldo].value = ws["J" + str(nLinhas + 1)].value - ws["J2"].value
+        ws["J" + saldo].fill = PatternFill("solid", fgColor="00FFFF00")
 
     wb.save("registroRegional.xlsx")
