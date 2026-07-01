@@ -2,6 +2,7 @@
 
 # Conector de sql recomendado na documentação oficial.
 from turtle import color
+import os
 import pyodbc
 import pandas as pd
 from datetime import datetime
@@ -14,6 +15,11 @@ from openpyxl.styles.numbers import NumberFormatList
 from openpyxl.styles import Font, Fill
 from openpyxl.styles import PatternFill
 from openpyxl.comments import Comment
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+REGIONAIS_DIR = os.path.join(BASE_DIR, 'regionais')
+os.makedirs(REGIONAIS_DIR, exist_ok=True)
+
 
 def createWorkBook(nomeR, regional, os_por_regional_mes):
     if('BOLSAO/PARANAIBA' in nomeR):
@@ -155,7 +161,7 @@ def createSheetLocal(nomeR, regional, os_por_regional_mes, nomeRegional):
             ws["J" + saldo].value = ws["J" + str(nLinhas + 1)].value - ws["J2"].value
             ws["J" + saldo].fill = PatternFill("solid", fgColor="00FFFF00")
 
-    wb.save('registro' + nomeR + '.xlsx')
+    wb.save(os.path.join(REGIONAIS_DIR, 'registro' + nomeR + '.xlsx'))
 
 def plotGraph(ws, max_row, nomeL):
 

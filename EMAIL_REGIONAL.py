@@ -18,6 +18,8 @@ ano_ref = (datetime.now() - timedelta(days=30)).strftime('%Y')
 
 # Obter o diretório onde o script está localizado
 script_dir = os.path.dirname(os.path.abspath(__file__))
+estado_dir = os.path.join(script_dir, 'estado')
+os.makedirs(estado_dir, exist_ok=True)
 assinatura_img_path = os.path.join(script_dir, 'assinatura.png')
 
 def send_email(subject, body, to_email, attachment_path=None, assinatura_img_path=None):
@@ -101,7 +103,7 @@ def main():
     body = f'''Bom dia a todos!!<br>Segue anexo a este e-mail a planilha do Relatório Geral Mensal, referente ao mês de {mes_extenso.lower()}, das regionais operadas pela Sanesul.<br> Obs: Foi adicionado um comentário em cada título de cada coluna, para ver o comentário basta aproximar o mouse no título da respectiva coluna.<br><br>Atenciosamente,'''
     
     # Usar caminho absoluto baseado na localização do script
-    attachment_path = os.path.join(script_dir, 'registroRegional.xlsx')
+    attachment_path = os.path.join(estado_dir, 'registroRegional.xlsx')
     
     print(f"[DEBUG] Diretório do script: {script_dir}")
     print(f"[DEBUG] Caminho do anexo: {attachment_path}")

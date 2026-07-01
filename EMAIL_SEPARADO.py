@@ -34,6 +34,8 @@ ano_ref = data_ref.strftime('%Y')
 
 # Obter o diretório onde o script está localizado
 script_dir = os.path.dirname(os.path.abspath(__file__))
+regionais_dir = os.path.join(script_dir, 'regionais')
+os.makedirs(regionais_dir, exist_ok=True)
 assinatura_img_path = os.path.join(script_dir, 'assinatura.png')
 
 def send_email(subject, body, to_email, attachment_path=None, assinatura_img_path=None, cc_emails=None):
@@ -114,7 +116,7 @@ def main():
     print(f"[DEBUG] Diretório do script: {script_dir}")
 
     for cfg in configs:
-        attachment_path = os.path.join(script_dir, cfg['arquivo'])
+        attachment_path = os.path.join(regionais_dir, cfg['arquivo'])
         print(f"[DEBUG] ({cfg['sigla']}) Caminho do anexo: {attachment_path} | Existe? {os.path.exists(attachment_path)}")
 
         if not os.path.exists(attachment_path):

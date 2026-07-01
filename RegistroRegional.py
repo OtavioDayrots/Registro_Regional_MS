@@ -1,5 +1,6 @@
 # pyinstaller RegistroRegional.py --onefile --noconsole
 
+import os
 import pyodbc
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -12,6 +13,10 @@ from openpyxl.styles.numbers import NumberFormatList
 from openpyxl.styles import Font, Fill
 from openpyxl.styles import PatternFill
 from openpyxl.comments import Comment
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ESTADO_DIR = os.path.join(BASE_DIR, 'estado')
+os.makedirs(ESTADO_DIR, exist_ok=True)
 
 
 def plotGraph(ws, max_row, nomeL):
@@ -299,4 +304,4 @@ if __name__ == "__main__":
         ws["J" + saldo].value = ws["J" + str(nLinhas + 1)].value - ws["J2"].value
         ws["J" + saldo].fill = PatternFill("solid", fgColor="00FFFF00")
 
-    wb.save("registroRegional.xlsx")
+    wb.save(os.path.join(ESTADO_DIR, "registroRegional.xlsx"))
